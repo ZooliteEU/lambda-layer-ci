@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: "Pipeline to build boto3 Lambda Layer."
+
+
+Parameters:
+  LayerName:
+    Type: String
+    Description: Name of the project.
+    Default: "boto3"
+
+
+Resources:
+
+  # -- CodeCommit repository
+  CodeCommitRepo:
+    Type: AWS::CodeCommit::Repository
+    Properties: 
+      RepositoryDescription: !Sub "Repository for ${LayerName} Lambda Layer"
+      RepositoryName: !Sub "${LayerName}-lambda-layer-${AWS::AccountId}"
+
+  
+  CodebuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: DefaultCodeBuildPolicy0
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - codebuild:StartBuild
+                  - Resource: !Sub "arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:${CodeCommitRepo}"
+                Effect: Allow
+                Action:
+                  - codecommit:GitPull
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - lambda:DeleteLayerVersion
+                  - lambda:GetLayerVersion
+                  - lambda:ListLayers
+                  - lambda:PublishLayerVersion
+                  - lambda:RemoveLayerVersionPermission
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+
+  # -- Codebuild Project
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Description: !Sub "${LayerName} Lambda Layer build"
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:1.0
+        Type: LINUX_CONTAINER
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+      Name: !Sub "${LayerName}-lambda-layer-build"
+      ServiceRole: !Ref CodebuildRole
+      Source:
+        Location: !GetAtt CodeCommitRepo.CloneUrlHttp
+        Type: CODECOMMIT
+      TimeoutInMinutes: 5
+
+
+Outputs:
+ CodeCommitUrlHttp:
+    Description: Codecommit repository url (http)
+    Value: !GetAtt CodeCommitRepo.CloneUrlHttp

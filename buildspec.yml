@@ -1,0 +1,17 @@
+version: 0.2
+
+phases:
+  #install:
+    #  runtime-versions:
+    #  docker: 18
+  pre_build:
+    commands:
+      - echo Start building boto3 Lambda Layer...
+  build:
+    commands:
+      - echo Build started on `date`
+      - make build 
+  post_build:
+    commands:
+      - echo Publish Lambda Layer
+      - make publish
